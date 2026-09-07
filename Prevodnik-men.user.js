@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         Automatický převodník měn a kalkulačka
 // @namespace    https://github.com/Martin-CHT/Skripty
-// @version      2.0.0
+// @version      2.0.1
 // @description  Automaticky převádí cizí měny, obsahuje přemístitelný HUD s kalkulačkou a blacklistem, tabulku kurzů a funguje jako kalkulačka v textových polích.
 // @author       Martin
 // @copyright    2026, Martin
 // @license      Proprietary - internal use only
 // @homepageURL  https://github.com/Martin-CHT/Skripty
-// @updateURL    https://raw.githubusercontent.com/Martin-CHT/Skripty/master/Skript/Prevodnik-men.user.js
-// @downloadURL  https://raw.githubusercontent.com/Martin-CHT/Skripty/master/Skript/Prevodnik-men.user.js
+// @updateURL    https://github.com/Martin-CHT/Skripty/raw/refs/heads/main/Prevodnik-men.user.js
+// @downloadURL  https://github.com/Martin-CHT/Skripty/raw/refs/heads/main/Prevodnik-men.user.js
 // @supportURL   https://github.com/Martin-CHT/Skripty/issues
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=open.er-api.com
 // @icon64       https://www.google.com/s2/favicons?sz=64&domain=open.er-api.com
