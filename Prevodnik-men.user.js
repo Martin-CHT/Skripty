@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Automatický převodník měn a kalkulačka
 // @namespace    https://github.com/Martin-CHT/Skripty
-// @version      2.0.1
+// @version      2.0.2
 // @description  Automaticky převádí cizí měny, obsahuje přemístitelný HUD s kalkulačkou a blacklistem, tabulku kurzů a funguje jako kalkulačka v textových polích.
 // @author       Martin
 // @copyright    2026, Martin
@@ -32,7 +32,7 @@
         conversionMode: 'permanent', // 'permanent', 'onclick_convert', 'onclick_orig'
         originalPosition: 'inline',   // 'inline', 'below'
         rounding: 'whole',            // 'none', 'whole', 'tens', 'hundreds'
-        thousandSeparator: 'space',   // 'space', 'dot', 'none'
+        thousandSeparator: 'space',   // 'space', 'dot', 'apostrophe', 'none'
         minimized: true,              // Výchozí stav je minimalizováno
         targetCurrency: 'CZK',        // Cílová měna převodu
         blacklist: [],                // Seznam zakázaných domén
@@ -44,6 +44,9 @@
         storedSettings.conversionMode = 'onclick_convert';
     }
     let settings = Object.assign({}, defaultSettings, storedSettings);
+    if (!['space', 'dot', 'apostrophe', 'none'].includes(settings.thousandSeparator)) {
+        settings.thousandSeparator = defaultSettings.thousandSeparator;
+    }
     if (!Array.isArray(settings.blacklist)) settings.blacklist = [];
     if (!settings.hudPosition || typeof settings.hudPosition.bottom !== 'number') {
         settings.hudPosition = { bottom: 20, right: 20 };
@@ -74,7 +77,7 @@
         'zlotých', 'złotych', 'zloté', 'złote', 'zloty', 'złoty',
         'franků', 'franky', 'franku', 'frank',
         'forintů', 'forinty', 'forintu', 'forint',
-        'jenů', 'jeny', 'jenu', 'jen',
+        'jenů', 'jeny', 'jenu',
         'dollars', 'dollar', 'bucks', 'buck',
         'euros', 'crowns', 'crown', 'pounds', 'pound', 'quid',
         'francs', 'franc', 'yens', 'yen'
@@ -161,18 +164,20 @@
         else if (settings.rounding === 'tens') rounded = Math.round(amount / 10) * 10;
         else if (settings.rounding === 'hundreds') rounded = Math.round(amount / 100) * 100;
 
-        let str = settings.rounding === 'none' ? rounded.toFixed(2).replace(/\.00$/, '') : rounded.toString();
+        return formatAmount(rounded, currencyCode, settings.rounding === 'none' ? 2 : null);
+    }
 
-        if (settings.thousandSeparator !== 'none') {
-            const parts = str.split('.');
-            const sep = settings.thousandSeparator === 'space' ? ' ' : '.';
-            parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, sep);
-            str = parts.join(currencyCode === 'CZK' ? ',' : '.');
-        } else if (currencyCode === 'CZK') {
-            str = str.replace('.', ',');
-        }
-
-        return `${str} ${currencyCode}`;
+    // Společné formátování výstupů; zaokrouhlení stránky nemění přesnost kurzů a tooltipu.
+    function formatAmount(amount, currencyCode, decimals = 2, keepZeros = false) {
+        let str = decimals === null ? amount.toString() : amount.toFixed(decimals);
+        if (!keepZeros) str = str.replace(/\.00$/, '');
+        const parts = str.split('.');
+        const separators = { space: ' ', dot: '.', apostrophe: "'", none: '' };
+        const sep = separators[settings.thousandSeparator] ?? ' ';
+        if (sep) parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+        // Tečka nesmí současně označovat tisíce i desetinná místa.
+        const decimalSeparator = currencyCode === 'CZK' || sep === '.' ? ',' : '.';
+        return parts.join(decimalSeparator) + ' ' + currencyCode;
     }
 
     function injectGlobalStyles() {
@@ -589,15 +594,15 @@
             targets = targets.filter((t, idx, self) => t !== code && self.indexOf(t) === idx);
 
             if (m.mathExpr) {
-                html += `<div style="color:#cbd5e1; font-size:11px; margin-bottom:2px;">Výpočet: ${m.mathExpr} = ${val} ${code}</div>`;
+                html += `<div style="color:#cbd5e1; font-size:11px; margin-bottom:2px;">Výpočet: ${m.mathExpr} = ${formatAmount(val, code)}</div>`;
             }
 
             targets.forEach((tgt, idx) => {
                 const converted = convertAmount(val, code, tgt);
                 if (converted !== null) {
-                    const resultStr = converted.toFixed(2).replace(/\.00$/, '');
-                    if (idx === 0) activeTooltipPrimaryReplacement = `${resultStr} ${tgt}`;
-                    html += `<div><span style="color:#94a3b8">${m.full.trim()} =</span> <span style="color:#34d399; font-weight:bold;">${resultStr} ${tgt}</span></div>`;
+                    const resultStr = formatAmount(converted, tgt);
+                    if (idx === 0) activeTooltipPrimaryReplacement = resultStr;
+                    html += `<div><span style="color:#94a3b8">${m.full.trim()} =</span> <span style="color:#34d399; font-weight:bold;">${resultStr}</span></div>`;
                 }
             });
         });
@@ -699,7 +704,7 @@
             tr.innerHTML = `
                 <td>1 ${code}</td>
                 <td>=</td>
-                <td style="font-weight: bold; text-align:right;">${valueInTarget.toFixed(2)} ${settings.targetCurrency}</td>
+                <td style="font-weight: bold; text-align:right;">${formatAmount(valueInTarget, settings.targetCurrency, 2, true)}</td>
             `;
             tbody.appendChild(tr);
         });
@@ -871,6 +876,16 @@
                         </select>
                     </div>
 
+                    <div class="form-group">
+                        <label for="sett-thousand-separator">Oddělovač tisíců</label>
+                        <select id="sett-thousand-separator">
+                            <option value="space" ${settings.thousandSeparator === 'space' ? 'selected' : ''}>Mezera (1 234,56)</option>
+                            <option value="dot" ${settings.thousandSeparator === 'dot' ? 'selected' : ''}>Tečka (1.234,56)</option>
+                            <option value="apostrophe" ${settings.thousandSeparator === 'apostrophe' ? 'selected' : ''}>Apostrof (1'234,56)</option>
+                            <option value="none" ${settings.thousandSeparator === 'none' ? 'selected' : ''}>Žádný (1234,56)</option>
+                        </select>
+                    </div>
+
                     <!-- Stáří kurzů a manuální aktualizace (3C) -->
                     <div class="section-title">
                         <span>Aktuální kurzy (<span id="rates-time-label">${formatTimeAgo(lastRatesFetchTime)}</span>)</span>
@@ -989,7 +1004,7 @@
             const targetCode = settings.targetCurrency;
             const converted = convertAmount(val, code, targetCode);
             if (converted !== null) {
-                quickResult.innerHTML = `${val} ${code} = <span style="color:#2563eb;">${formatCurrency(converted, targetCode)}</span>`;
+                quickResult.innerHTML = `${formatAmount(val, code)} = <span style="color:#2563eb;">${formatCurrency(converted, targetCode)}</span>`;
             }
         });
 
@@ -1017,6 +1032,7 @@
         shadowRoot.querySelector('#btn-save').addEventListener('click', () => {
             settings.enabled = shadowRoot.querySelector('#sett-enabled').checked;
             settings.rounding = shadowRoot.querySelector('#sett-rounding').value;
+            settings.thousandSeparator = shadowRoot.querySelector('#sett-thousand-separator').value;
             settings.targetCurrency = shadowRoot.querySelector('#sett-target').value;
             settings.conversionMode = shadowRoot.querySelector('#sett-conv-mode').value;
             settings.originalPosition = shadowRoot.querySelector('#sett-orig-pos').value;
